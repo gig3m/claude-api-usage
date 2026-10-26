@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "id": "gig3m.claude-api-usage",
+  "name": "Claude API Usage",
+  "version": "0.2.0",
+  "author": "Kyle Arrington",
+  "license": "MIT",
+  "description": "Claude API spend against a monthly credit: a pace gauge on the bar and a flyout with daily trend, today by hour, and breakdowns by model, API key and token type. Uses the Anthropic Admin API.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Claude API Usage",
+    "description": "Pace gauge (credit used vs cycle elapsed). Click for the flyout, right click refreshes, middle click opens the Console cost page.",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "credit": 200,
+      "cycleStartDay": 1,
+      "refreshMinutes": 5,
+      "barLabel": "none",
+      "keyEnv": "ANTHROPIC_ADMIN_KEY",
+      "keyExec": ""
+    },
+    "schema": [
+      {
+        "key": "credit",
+        "type": "number",
+        "label": "Monthly credit (USD)",
+        "description": "Budget to pace against, e.g. the API credit included with a Max plan ($100 on 5x, $200 on 20x).",
+        "defaultValue": 200
+      },
+      {
+        "key": "cycleStartDay",
+        "type": "number",
+        "label": "Credit cycle start day",
+        "description": "Day of the month the credit refreshes (UTC).",
+        "defaultValue": 1
+      },
+      {
+        "key": "refreshMinutes",
+        "type": "number",
+        "label": "Refresh interval (minutes)",
+        "description": "Cost data lags by up to a day; usage by about 5 minutes. Results are cached for a minute across monitors.",
+        "defaultValue": 5
+      },
+      {
+        "key": "barLabel",
+        "type": "enum",
+        "label": "Bar label",
+        "description": "Text next to the gauge.",
+        "defaultValue": "none",
+        "options": [
+          "none",
+          "spent",
+          "percent",
+          "projected"
+        ]
+      },
+      {
+        "key": "keyEnv",
+        "type": "string",
+        "label": "Admin key variable",
+        "description": "Environment variable that holds the Admin API key.",
+        "defaultValue": "ANTHROPIC_ADMIN_KEY"
+      },
+      {
+        "key": "keyExec",
+        "type": "string",
+        "label": "Key wrapper command",
+        "description": "Optional command prefix that runs the fetch script with the key variable set, e.g. 'op run --env-file=/path/to/env --'. Leave empty to use the variable or the key file.",
+        "defaultValue": ""
+      }
+    ]
+  },
+  "homepage": "https://github.com/gig3m/claude-api-usage"
+}

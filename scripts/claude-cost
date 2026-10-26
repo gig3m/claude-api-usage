@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# Prints Claude API spend and usage for the current credit cycle as JSON (shape: scripts/report.jq).
+#
+# Usage: claude-cost [--cycle-day N] [--key-env NAME] [--key-exec 'CMD ...'] [--force]
+#   --cycle-day N      day of month the API credit refreshes (default 1)
+#   --key-env NAME     environment variable holding the Admin API key (default ANTHROPIC_ADMIN_KEY)
+#   --key-exec CMD     command prefix that runs a program with NAME set, e.g.
+#                      'op run --env-file=/path/to/env --' (any command that sets NAME and runs its arguments)
+#   --force            skip the shared cache
+#
+# The key is read from, in order: the NAME environment variable, the --key-exec
+# wrapper, then ${XDG_CONFIG_HOME:-~/.config}/claude-api-usage/admin-key (mode 600).
+# Every monitor's bar runs this, so results are cached for a minute (the API's poll rate).
+
+set -uo pipefail
+
+cycle_day=1
+key_env=ANTHROPIC_ADMIN_KEY
+key_exec=
+force=
+via_wrapper=
+while (( $# )); do
+  case $1 in
+    --cycle-day) cycle_day=${2:-}; shift 2 || break ;;
+    --key-env) key_env=${2:-}; shift 2 || break ;;
+    --key-exec) key_exec=${2:-}; shift 2 || break ;;
+    --force) force=--force; shift ;;
+    --via-wrapper) via_wrapper=1; shift ;;
+    *) shift ;;
+  esac
+done
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cache_dir=${XDG_RUNTIME_DIR:-/tmp}/claude-api-usage
+key_file=${XDG_CONFIG_HOME:-$HOME/.config}/claude-api-usage/admin-key
+max_age=60
+key_names_age=3600
+api=https://api.anthropic.com/v1/organizations
+
+fail() {
+  if command -v jq >/dev/null; then jq -cn --arg error "$1" '{error: $error}'
+  else printf '{"error":"%s"}\n' "${1//\"/\'}"; fi
+  exit 1
+}
+
+command -v jq >/dev/null || fail "jq is not installed"
+command -v curl >/dev/null || fail "curl is not installed"
+if ! [[ $cycle_day =~ ^[0-9]+$ ]] || (( 10#$cycle_day < 1 || 10#$cycle_day > 31 )); then
+  fail "cycle day must be 1-31"
+fi
+# Upper case only, so the name can't collide with this script's own (lower-case) variables.
+[[ $key_env =~ ^[A-Z_][A-Z0-9_]*$ ]] || fail "key env must be an upper-case variable name"
+
+fresh() { [[ -s $1 ]] && (( $(date +%s) - $(stat -c %Y "$1") < $2 )); }
+
+if ! mkdir -p "$cache_dir" || ! chmod 700 "$cache_dir"; then
+  fail "cannot create $cache_dir"
+fi
+cache="$cache_dir/day-$((10#$cycle_day)).json"
+
+# One fetch at a time per cycle day. Every copy checks the cache after taking
+# the lock, so widgets that refresh together share one fetch.
+exec 9>"$cache.lock"
+flock -w 60 9 || fail "another claude-cost run is stuck"
+if [[ -z $force ]] && fresh "$cache" "$max_age"; then
+  cat "$cache"
+  exit 0
+fi
+
+admin_key=${!key_env:-}
+if [[ -z $admin_key && -n $key_exec && -z $via_wrapper ]]; then
+  # Re-run under the wrapper. The copy gets no --key-exec, so it can't recurse.
+  # xargs splits on whitespace and honours quotes, without expanding or running anything.
+  mapfile -d '' wrapper < <(xargs printf '%s\0' <<<"$key_exec" 2>/dev/null)
+  if ! wait $! || (( ${#wrapper[@]} == 0 )); then
+    fail "could not parse keyExec (check its quotes): $key_exec"
+  fi
+  command -v "${wrapper[0]}" >/dev/null || fail "key wrapper not found: ${wrapper[0]}"
+  exec 9>&-
+  errors=$(mktemp "$cache_dir/wrapper.XXXXXX") || fail "cannot create a temp file in $cache_dir"
+  trap 'rm -f "$errors"' EXIT
+  out=$("${wrapper[@]}" "${BASH_SOURCE[0]}" --via-wrapper \
+    --cycle-day "$cycle_day" --key-env "$key_env" ${force:+"$force"} 2>"$errors")
+  status=$?
+  last=$(tail -n 1 <<<"$out")
+  if jq -e 'type == "object"' <<<"$last" >/dev/null 2>&1; then
+    printf '%s\n' "$last"
+    exit "$status"
+  fi
+  # Show the wrapper's first error line, with anything key-shaped masked.
+  reason=$(grep -v '^[[:space:]]*$' "$errors" | head -n 1 | sed -E 's/sk-ant-[A-Za-z0-9_-]+/sk-ant-…/g' | cut -c1-160)
+  fail "key wrapper failed (exit $status)${reason:+: $reason}"
+fi
+if [[ -z $admin_key && -e $key_file ]]; then
+  [[ -f $key_file && -r $key_file ]] || fail "cannot read $key_file"
+  perms=$(stat -L -c %a "$key_file")
+  (( (8#$perms & 8#077) == 0 )) || fail "$key_file must be readable only by you (chmod 600)"
+  admin_key=$(<"$key_file")
+fi
+if [[ -z $admin_key ]]; then
+  [[ -n $via_wrapper ]] && fail "keyExec ran but did not set $key_env"
+  fail "No Admin API key: set $key_env, configure keyExec, or create $key_file"
+fi
+# Same clean-up for every source, then refuse anything that isn't an Anthropic key
+# (a wrong keyEnv such as HOME must not be sent to the API).
+admin_key=${admin_key//[$'\t\r\n ']/}
+[[ $admin_key =~ ^sk-ant-[A-Za-z0-9_-]+$ ]] || fail "$key_env does not hold an Anthropic API key (sk-ant-…)"
+
+# Cost buckets are UTC days. The cycle starts on cycle_day of this month,
+# or of last month if that day hasn't come yet; days past a month's end
+# fall on its last day (a cycle day of 31 starts on Feb 28).
+cycle_start_in() {  # YYYY-MM
+  local last
+  last=$(date -u -d "$1-01 +1 month -1 day" +%d)
+  printf '%s-%02d' "$1" $(( 10#$cycle_day < 10#$last ? 10#$cycle_day : 10#$last ))
+}
+shift_month() { date -u -d "${1:0:7}-01 $2 month" +%Y-%m; }
+today=$(date -u +%F)
+start=$(cycle_start_in "${today:0:7}")
+[[ $start > $today ]] && start=$(cycle_start_in "$(shift_month "$today" -1)")
+cycle_end=$(cycle_start_in "$(shift_month "$start" +1)")
+prev_start=$(cycle_start_in "$(shift_month "$start" -1)")
+tomorrow=$(date -u -d "$today +1 day" +%F)
+
+# The key reaches curl as a config file on stdin, so it never shows in argv.
+get() {  # path, then param=value pairs
+  local path=$1 arg args=()
+  shift
+  for arg; do args+=(--data-urlencode "$arg"); done
+  printf 'header = "x-api-key: %s"\n' "$admin_key" |
+    curl -sS --fail-with-body --max-time 20 -K - -G 9>&- \
+      -H "anthropic-version: 2023-06-01" "${args[@]}" "$api/$path"
+}
+
+# Follows next_page and prints {data: [...all pages]}.
+get_all() {
+  local body page='' seen=' ' pages=()
+  while :; do
+    if ! body=$(get "$@" ${page:+"page=$page"}); then
+      fail "$(jq -r '.error.message // empty' <<<"$body" 2>/dev/null | grep . || echo "Admin API request failed ($1)")"
+    fi
+    pages+=("$body")
+    [[ $(jq -r '.has_more' <<<"$body" 2>/dev/null) == true ]] || break
+    page=$(jq -r '.next_page // empty' <<<"$body")
+    [[ -n $page && $seen != *" $page "* ]] || fail "Admin API pagination did not advance ($1)"
+    seen+="$page "
+  done
+  printf '%s\n' "${pages[@]}" | jq -cs '{data: [.[].data[]]}' || fail "Could not read $1"
+}
+
+cost=$(get_all cost_report "starting_at=${start}T00:00:00Z" "ending_at=${tomorrow}T00:00:00Z" \
+  limit=31 "group_by[]=description") || { printf '%s\n' "$cost"; exit 1; }
+prev=$(get_all cost_report "starting_at=${prev_start}T00:00:00Z" "ending_at=${start}T00:00:00Z" \
+  limit=31) || { printf '%s\n' "$prev"; exit 1; }
+usage=$(get_all usage_report/messages "starting_at=${start}T00:00:00Z" "ending_at=${tomorrow}T00:00:00Z" \
+  bucket_width=1d limit=31 "group_by[]=api_key_id" "group_by[]=model") || { printf '%s\n' "$usage"; exit 1; }
+hourly=$(get_all usage_report/messages "starting_at=${today}T00:00:00Z" "ending_at=${tomorrow}T00:00:00Z" \
+  bucket_width=1h limit=24 "group_by[]=model") || { printf '%s\n' "$hourly"; exit 1; }
+
+# Key names change rarely; a failed lookup only costs the names. (api_keys pages
+# by after_id, not next_page; the first 100 keys are plenty here.)
+names="$cache_dir/api-keys.json"
+if ! fresh "$names" "$key_names_age"; then
+  if get api_keys limit=100 > "$names.tmp" 2>/dev/null && jq -e '.data | type == "array"' "$names.tmp" >/dev/null 2>&1; then
+    mv "$names.tmp" "$names"
+  else
+    rm -f "$names.tmp"
+  fi
+fi
+[[ -s $names ]] || echo '{"data":[]}' > "$names"
+
+report=$(jq -cn \
+  --arg start "$start" --arg end "$cycle_end" --arg prevStart "$prev_start" --arg today "$today" \
+  --argjson cost "$cost" --argjson prev "$prev" --argjson usage "$usage" --argjson hourly "$hourly" \
+  --slurpfile names "$names" \
+  -f "$here/report.jq") || fail "Could not build the report"
+
+printf '%s\n' "$report" > "$cache.tmp" && mv "$cache.tmp" "$cache"
+printf '%s\n' "$report"

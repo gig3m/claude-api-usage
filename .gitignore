@@ -1,0 +1,6 @@
+# Never commit a key or a captured report.
+admin-key
+*.env
+*.json.tmp
+report.json
+TASKS.md
