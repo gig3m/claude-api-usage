@@ -7,6 +7,7 @@
 #   --key-exec CMD     command prefix that runs a program with NAME set, e.g.
 #                      'op run --env-file=/path/to/env --' (any command that sets NAME and runs its arguments)
 #   --force            skip the shared cache
+#   --demo             print made-up data instead of calling the API
 #
 # The key is read from, in order: the NAME environment variable, the --key-exec
 # wrapper, then ${XDG_CONFIG_HOME:-~/.config}/claude-api-usage/admin-key (mode 600).
@@ -19,6 +20,7 @@ key_env=ANTHROPIC_ADMIN_KEY
 key_exec=
 force=
 via_wrapper=
+demo=
 while (( $# )); do
   case $1 in
     --cycle-day) cycle_day=${2:-}; shift 2 || break ;;
@@ -26,6 +28,7 @@ while (( $# )); do
     --key-exec) key_exec=${2:-}; shift 2 || break ;;
     --force) force=--force; shift ;;
     --via-wrapper) via_wrapper=1; shift ;;
+    --demo) demo=1; shift ;;
     *) shift ;;
   esac
 done
@@ -51,6 +54,32 @@ fi
 # Upper case only, so the name can't collide with this script's own (lower-case) variables.
 [[ $key_env =~ ^[A-Z_][A-Z0-9_]*$ ]] || fail "key env must be an upper-case variable name"
 
+# Cost buckets are UTC days. The cycle starts on cycle_day of this month,
+# or of last month if that day hasn't come yet; days past a month's end
+# fall on its last day (a cycle day of 31 starts on Feb 28).
+cycle_start_in() {  # YYYY-MM
+  local last
+  last=$(date -u -d "$1-01 +1 month -1 day" +%d)
+  printf '%s-%02d' "$1" $(( 10#$cycle_day < 10#$last ? 10#$cycle_day : 10#$last ))
+}
+shift_month() { date -u -d "${1:0:7}-01 $2 month" +%Y-%m; }
+set_cycle_dates() {
+  today=$(date -u +%F)
+  start=$(cycle_start_in "${today:0:7}")
+  [[ $start > $today ]] && start=$(cycle_start_in "$(shift_month "$today" -1)")
+  cycle_end=$(cycle_start_in "$(shift_month "$start" +1)")
+  prev_start=$(cycle_start_in "$(shift_month "$start" -1)")
+  tomorrow=$(date -u -d "$today +1 day" +%F)
+}
+set_cycle_dates
+
+# --demo prints made-up data for the current cycle (screenshots, trying it without a key).
+if [[ -n $demo ]]; then
+  jq -cn --arg start "$start" --arg end "$cycle_end" --arg prevStart "$prev_start" --arg today "$today" \
+    -f "$here/demo.jq" || fail "Could not build the demo report"
+  exit 0
+fi
+
 fresh() { [[ -s $1 ]] && (( $(date +%s) - $(stat -c %Y "$1") < $2 )); }
 
 if ! mkdir -p "$cache_dir" || ! chmod 700 "$cache_dir"; then
@@ -62,6 +91,7 @@ cache="$cache_dir/day-$((10#$cycle_day)).json"
 # the lock, so widgets that refresh together share one fetch.
 exec 9>"$cache.lock"
 flock -w 60 9 || fail "another claude-cost run is stuck"
+set_cycle_dates  # again: waiting for the lock can cross UTC midnight
 if [[ -z $force ]] && fresh "$cache" "$max_age"; then
   cat "$cache"
   exit 0
@@ -105,22 +135,6 @@ fi
 # (a wrong keyEnv such as HOME must not be sent to the API).
 admin_key=${admin_key//[$'\t\r\n ']/}
 [[ $admin_key =~ ^sk-ant-[A-Za-z0-9_-]+$ ]] || fail "$key_env does not hold an Anthropic API key (sk-ant-…)"
-
-# Cost buckets are UTC days. The cycle starts on cycle_day of this month,
-# or of last month if that day hasn't come yet; days past a month's end
-# fall on its last day (a cycle day of 31 starts on Feb 28).
-cycle_start_in() {  # YYYY-MM
-  local last
-  last=$(date -u -d "$1-01 +1 month -1 day" +%d)
-  printf '%s-%02d' "$1" $(( 10#$cycle_day < 10#$last ? 10#$cycle_day : 10#$last ))
-}
-shift_month() { date -u -d "${1:0:7}-01 $2 month" +%Y-%m; }
-today=$(date -u +%F)
-start=$(cycle_start_in "${today:0:7}")
-[[ $start > $today ]] && start=$(cycle_start_in "$(shift_month "$today" -1)")
-cycle_end=$(cycle_start_in "$(shift_month "$start" +1)")
-prev_start=$(cycle_start_in "$(shift_month "$start" -1)")
-tomorrow=$(date -u -d "$today +1 day" +%F)
 
 # The key reaches curl as a config file on stdin, so it never shows in argv.
 get() {  # path, then param=value pairs

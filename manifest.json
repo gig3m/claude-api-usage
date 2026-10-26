@@ -24,7 +24,8 @@
       "refreshMinutes": 5,
       "barLabel": "none",
       "keyEnv": "ANTHROPIC_ADMIN_KEY",
-      "keyExec": ""
+      "keyExec": "",
+      "demo": false
     },
     "schema": [
       {
@@ -74,6 +75,13 @@
         "label": "Key wrapper command",
         "description": "Optional command prefix that runs the fetch script with the key variable set, e.g. 'op run --env-file=/path/to/env --'. Leave empty to use the variable or the key file.",
         "defaultValue": ""
+      },
+      {
+        "key": "demo",
+        "type": "boolean",
+        "label": "Demo data",
+        "description": "Show made-up numbers instead of calling the API (for screenshots or trying it out).",
+        "defaultValue": false
       }
     ]
   },

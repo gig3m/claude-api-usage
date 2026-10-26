@@ -20,6 +20,8 @@ BarWidget {
   readonly property string barLabel: String(setting("barLabel", "none"))
   readonly property string keyEnv: String(setting("keyEnv", "ANTHROPIC_ADMIN_KEY"))
   readonly property string keyExec: String(setting("keyExec", ""))
+  // `omarchy bar set` stores the string "true" unless given --json.
+  readonly property bool demo: String(setting("demo", false)) === "true"
   readonly property string script: localPath(Qt.resolvedUrl("scripts/claude-cost"))
   readonly property bool loaded: report.total !== undefined
   readonly property bool fetching: costProcess.running
@@ -77,6 +79,7 @@ BarWidget {
     if (error === "claude-cost timed out") error = ""
     costProcess.command = ["timeout", "90", script, "--cycle-day", String(cycleStartDay), "--key-env", keyEnv]
       .concat(keyExec !== "" ? ["--key-exec", keyExec] : [])
+      .concat(demo ? ["--demo"] : [])
       .concat(force === true ? ["--force"] : [])
     costProcess.running = true
   }
@@ -132,6 +135,7 @@ BarWidget {
   onCycleStartDayChanged: refresh()
   onKeyEnvChanged: refresh()
   onKeyExecChanged: refresh()
+  onDemoChanged: refresh(true)
 
   Loader {
     id: panelLoader

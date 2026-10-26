@@ -34,7 +34,8 @@ Panel {
   readonly property color dim: Qt.rgba(barForeground.r, barForeground.g, barForeground.b, 0.55)
   readonly property color faint: Qt.rgba(barForeground.r, barForeground.g, barForeground.b, 0.14)
   readonly property color paceColor: burningHot ? Color.urgent : Color.accent
-  readonly property var modelColors: [Color.accent, "#168cfa", "#f05a9d", "#e0a030"]
+  // The first model takes the theme accent; the rest are picked to stay apart from common accents.
+  readonly property var modelColors: [Color.accent, "#e0a030", "#f05a9d", "#9b7cf2"]
 
   function money(value) { return hostWidget ? hostWidget.money(value) : "$0.00" }
   function percent(part, whole) { return hostWidget ? hostWidget.percent(part, whole) : "–" }

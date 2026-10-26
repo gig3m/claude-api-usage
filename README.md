@@ -2,7 +2,12 @@
 
 An [Omarchy](https://omarchy.org) bar widget that tracks your Claude API spend against a monthly credit, using the Anthropic [Usage and Cost Admin API](https://platform.claude.com/docs/en/manage-claude/usage-cost-api).
 
+<img src="preview.png" alt="The flyout: spend against the credit, pace, daily spend stacked by model, today by hour, and breakdowns by model, API key and token type" width="380" align="right">
+
 The bar shows a small **pace gauge**:
+
+<img src="docs/gauge.png" alt="The bar gauge" width="126">
+
 
 - the solid fill is how much of the credit you've used,
 - the faint fill is where you're projected to end the cycle,
@@ -17,6 +22,8 @@ Click it for a flyout with:
 - daily spend for the whole cycle, stacked by model, with a budget line
 - today by hour
 - breakdowns by model, by API key, and by token type, plus cache hit rate
+
+*(Screenshots use the widget's demo data.)*
 
 It was built for the API credit that comes with Claude Max plans ($100/month on Max 5x, $200 on Max 20x), but any monthly budget works.
 
@@ -60,6 +67,8 @@ omarchy bar set gig3m.claude-api-usage cycleStartDay 3 --json   # credit renews 
 omarchy bar set gig3m.claude-api-usage credit 200 --json
 ```
 
+<br clear="right">
+
 ## Settings
 
 | Key | Default | |
@@ -70,6 +79,7 @@ omarchy bar set gig3m.claude-api-usage credit 200 --json
 | `barLabel` | `none` | Text next to the gauge: `none`, `spent`, `percent` or `projected`. |
 | `keyEnv` | `ANTHROPIC_ADMIN_KEY` | Variable that holds the key. |
 | `keyExec` | *(empty)* | Optional wrapper command (see Install). |
+| `demo` | `false` | Show made-up numbers instead of calling the API. Handy for trying the widget before you have a key: `omarchy bar set gig3m.claude-api-usage demo true --json` |
 
 **Mouse:** left click opens the flyout, right click refreshes, middle click opens the Console cost page. In the flyout, `R` refreshes and `O` opens the Console. The flyout can also be toggled with `omarchy-shell gig3m.claude-api-usage toggle`.
 
