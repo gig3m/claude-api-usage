@@ -69,6 +69,21 @@ omarchy bar set gig3m.claude-api-usage credit 200 --json
 
 <br clear="right">
 
+## Remove
+
+```sh
+omarchy plugin remove gig3m.claude-api-usage
+```
+
+This disables the plugin and deletes its folder. Outside that folder the plugin only ever writes to two places. Delete these yourself if you used them:
+
+```sh
+rm -rf ~/.config/claude-api-usage           # key file, if you created one
+rm -rf "$XDG_RUNTIME_DIR/claude-api-usage"  # one-minute cache (cleared at logout anyway)
+```
+
+The Admin API key stays valid until you revoke it in the Console under **Settings → Admin keys**.
+
 ## Settings
 
 | Key | Default | |
@@ -94,7 +109,7 @@ omarchy bar set gig3m.claude-api-usage credit 200 --json
 
 - The key is passed to `curl` as a config file on stdin, so it never appears in a process's arguments. With methods 1 and 2 it is in the fetch script's environment, which only your user can read.
 - Anything that doesn't look like an Anthropic key (`sk-ant-…`) is refused before a request is made. This stops a mistyped `keyEnv` from sending some other value to the API.
-- Results are cached for 60 seconds in `$XDG_RUNTIME_DIR/claude-api-usage/` (mode 700). The bar runs one widget per monitor, and they all share one fetch. API key names are cached for an hour.
+- Results are cached for 60 seconds in `$XDG_RUNTIME_DIR/claude-api-usage/` (mode 700). The plugin never falls back to a shared directory like `/tmp`. The bar runs one widget per monitor, and they all share one fetch. API key names are cached for an hour.
 - Each refresh makes four Admin API requests, plus one for key names once an hour.
 
 ## License

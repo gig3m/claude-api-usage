@@ -34,7 +34,7 @@ while (( $# )); do
 done
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cache_dir=${XDG_RUNTIME_DIR:-/tmp}/claude-api-usage
+cache_dir=${XDG_RUNTIME_DIR:+$XDG_RUNTIME_DIR/claude-api-usage}
 key_file=${XDG_CONFIG_HOME:-$HOME/.config}/claude-api-usage/admin-key
 max_age=60
 key_names_age=3600
@@ -82,6 +82,8 @@ fi
 
 fresh() { [[ -s $1 ]] && (( $(date +%s) - $(stat -c %Y "$1") < $2 )); }
 
+# Private per-user runtime dir only; never a shared, predictable path like /tmp.
+[[ -n $cache_dir ]] || fail "XDG_RUNTIME_DIR is not set"
 if ! mkdir -p "$cache_dir" || ! chmod 700 "$cache_dir"; then
   fail "cannot create $cache_dir"
 fi
