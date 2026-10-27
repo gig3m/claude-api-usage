@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gig3m.claude-api-usage",
   "name": "Claude API Usage",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Kyle Arrington",
   "license": "MIT",
   "description": "Claude API spend against a monthly credit: a pace gauge on the bar and a flyout with daily trend, today by hour, and breakdowns by model, API key and token type. Uses the Anthropic Admin API.",

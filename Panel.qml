@@ -107,6 +107,7 @@ Panel {
     height: Style.space(30)
 
     Text {
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.right: valueText.left
       anchors.rightMargin: Style.space(8)
@@ -119,6 +120,7 @@ Panel {
     }
     Text {
       id: valueText
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.top: parent.top
       text: row.value
@@ -145,6 +147,7 @@ Panel {
   }
 
   component SectionTitle: Text {
+    textFormat: Text.PlainText
     color: Color.accent
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
@@ -159,12 +162,14 @@ Panel {
     width: (parent.width - parent.spacing * 2) / 3
     spacing: Style.space(2)
     Text {
+      textFormat: Text.PlainText
       text: parent.label
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
     }
     Text {
+      textFormat: Text.PlainText
       text: parent.value
       color: parent.valueColor
       font.family: root.fontFamily
@@ -211,6 +216,7 @@ Panel {
           width: parent.width
           height: Style.space(26)
           Text {
+            textFormat: Text.PlainText
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: "CLAUDE API"
@@ -220,6 +226,7 @@ Panel {
             font.bold: true
           }
           Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: root.loaded ? root.money(root.total) + " / " + root.shortMoney(root.credit) : "…"
@@ -231,6 +238,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           visible: root.loaded
           text: root.shortDate(root.report.cycleStart) + " → " + root.shortDate(root.report.cycleEnd)
@@ -275,6 +283,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           visible: root.loaded
           wrapMode: Text.WordWrap
@@ -318,6 +327,7 @@ Panel {
           height: Style.space(18)
           SectionTitle { anchors.left: parent.left; text: "DAILY SPEND" }
           Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             text: "- - budget " + root.money(root.budgetPerDay) + "/day"
             color: root.dim
@@ -413,6 +423,7 @@ Panel {
           width: parent.width
           height: Style.space(14)
           Text {
+            textFormat: Text.PlainText
             anchors.left: parent.left
             text: root.shortDate(root.report.cycleStart)
             color: root.dim
@@ -420,6 +431,7 @@ Panel {
             font.pixelSize: Style.font.caption
           }
           Text {
+            textFormat: Text.PlainText
             anchors.horizontalCenter: parent.horizontalCenter
             text: "dashed bar = today, estimated"
             color: root.dim
@@ -427,6 +439,7 @@ Panel {
             font.pixelSize: Style.font.caption
           }
           Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             text: root.shortDate(root.report.cycleEnd)
             color: root.dim
@@ -452,6 +465,7 @@ Panel {
                 color: root.modelColors[index % root.modelColors.length]
               }
               Text {
+                textFormat: Text.PlainText
                 text: root.modelName(modelData)
                 color: root.barForeground
                 font.family: root.fontFamily
@@ -473,6 +487,7 @@ Panel {
               + (root.report.today && root.report.today.unpriced ? " · SOME MODELS UNPRICED" : "")
           }
           Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             text: root.report.today ? root.compact(root.report.today.tokens) + " tokens" : ""
             color: root.dim
@@ -517,6 +532,7 @@ Panel {
           Repeater {
             model: [0, 6, 12, 18]
             delegate: Text {
+              textFormat: Text.PlainText
               required property int modelData
               x: modelData / 24 * parent.width
               text: String(modelData).padStart(2, "0")
@@ -591,6 +607,7 @@ Panel {
         Divider {}
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           wrapMode: Text.WordWrap
           text: (root.hostWidget && root.hostWidget.error !== "" ? root.hostWidget.error + "  ·  " : "")

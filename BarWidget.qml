@@ -173,6 +173,7 @@ BarWidget {
       spacing: Style.spaceReal(5)
 
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: "󰚩"
         color: button.foreground
@@ -223,6 +224,7 @@ BarWidget {
       }
 
       Text {
+        textFormat: Text.PlainText
         visible: text !== "" && !root.vertical
         anchors.verticalCenter: parent.verticalCenter
         text: root.labelText()
